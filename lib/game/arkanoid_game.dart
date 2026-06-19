@@ -244,6 +244,10 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
 
   @override
   void update(double dt) {
+    // Cap dt to 33ms: prevents ball tunneling when Android drops frame rate
+    // (e.g. after touch-boost timeout: "high hint" → "no preference")
+    dt = dt.clamp(0.0, 1 / 30.0);
+
     if (_bgInitialized) _bg.update(dt);
 
     super.update(dt);
@@ -268,7 +272,9 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     }
     for (int i = _bullets.length - 1; i >= 0; i--) {
       _bullets[i].update(dt);
-      if (_bullets[i].y > size.y + 20) {
+      // Снаряд касается ракетки ИЛИ вышел за экран — потеря жизни
+      final bHitsPaddle = _bullets[i].rect.overlaps(paddle.toAbsoluteRect());
+      if (bHitsPaddle || _bullets[i].y > size.y) {
         _bullets.removeAt(i);
         _bossBulletReachedBottom();
       }
@@ -286,9 +292,10 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     }
     for (int i = _creatureBullets.length - 1; i >= 0; i--) {
       _creatureBullets[i].update(dt);
-      if (_creatureBullets[i].y > size.y + 20) {
+      final cHitsPaddle = _creatureBullets[i].rect.overlaps(paddle.toAbsoluteRect());
+      if (cHitsPaddle || _creatureBullets[i].y > size.y) {
         _creatureBullets.removeAt(i);
-        _bossBulletReachedBottom(); // потеря жизни — тот же код
+        _bossBulletReachedBottom();
       }
     }
 

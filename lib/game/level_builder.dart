@@ -48,16 +48,16 @@ class LevelBuilder {
       '___XX___',
       'LLLLLLLL',
     ],
-    // Level 5 — крест, 1 динамит на верхней секции
+    // Level 5 — два барьера с широкими проходами, без центральной X-колонны
     [
-      'MMMXXMMM',
-      'MMDXXMMM',
-      '_XXXXXX_',
-      'HHHXXHHH',
-      'MMMXXMMM',
-      '_XXXXXX_',
-      'MMMXXMMM',
-      'MMMXXMMM',
+      'MMM__MMM',
+      'MMD__MMM',
+      '__XXXX__', // барьер 1 — 2 прохода по 2 кирпича
+      'HHH__HHH',
+      'MMM__MMM',
+      '__XXXX__', // барьер 2 — 2 прохода по 2 кирпича
+      'MMMMMMMM',
+      'MMMMMMMM',
     ],
     // Level 6 — хаос (генерируется, 1 динамит добавляется отдельно)
     [],
