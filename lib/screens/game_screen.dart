@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import '../data/score_repository.dart';
+import '../data/progress_repository.dart';
 import '../game/arkanoid_game.dart';
 import '../game/powerup.dart';
 import '../theme/theme_notifier.dart';
@@ -68,7 +69,10 @@ class _GameScreenState extends State<GameScreen> {
 
   void _onGameOver() {
     if (!mounted) return;
-    ScoreRepository.instance.addScore(_score, _game.currentLevel);
+    ScoreRepository.instance.addScore(_score, _game.currentLevel).then((_) {
+      ProgressRepository.instance.onScoreAdded(
+          ScoreRepository.instance.bestScore);
+    });
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) setState(() => _showGameOver = true);
     });
@@ -106,7 +110,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _handleMenu() {
-    ScoreRepository.instance.addScore(_score, _game.currentLevel);
+    ScoreRepository.instance.addScore(_score, _game.currentLevel).then((_) {
+      ProgressRepository.instance.onScoreAdded(ScoreRepository.instance.bestScore);
+    });
     Navigator.of(context).pop();
   }
 
@@ -120,7 +126,9 @@ class _GameScreenState extends State<GameScreen> {
     );
     if (confirmed == true) {
       if (mounted) {
-        ScoreRepository.instance.addScore(_score, _game.currentLevel);
+        ScoreRepository.instance.addScore(_score, _game.currentLevel).then((_) {
+          ProgressRepository.instance.onScoreAdded(ScoreRepository.instance.bestScore);
+        });
         Navigator.of(context).pop();
       }
     } else {

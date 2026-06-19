@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'data/score_repository.dart';
+import 'data/progress_repository.dart';
 import 'theme/theme_notifier.dart';
 import 'screens/menu_screen.dart';
 
@@ -17,12 +18,14 @@ void main() async {
   // Hide status/nav bars for immersive game feel
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // Load saved theme and scores
-  await themeNotifier.load();
+  // Load scores first (needed for unlock checks)
   await ScoreRepository.instance.load();
 
-  // Init AdMob
-  
+  // Load progress (unlocked worlds, selected theme) based on best score
+  await ProgressRepository.instance.load(ScoreRepository.instance.bestScore);
+
+  // Load saved theme selection
+  await themeNotifier.load();
 
   runApp(const ArkanoidApp());
 }

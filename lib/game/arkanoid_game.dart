@@ -68,7 +68,7 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
   bool _tripleBallUnlocked = false;
 
   // Система боссов
-  int _totalLevelsCompleted = 0;
+  int _bossCount = 0; // сколько боссов уже было побеждено
   bool _isBossLevel = false;
   bool justDefeatedBoss = false;
   int _bossHp = 0;
@@ -319,6 +319,7 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
         break;
       case PowerUpType.fireball:
         ball.setFireball(false);
+        _escapeBallFromBricks(ball);
         break;
       case PowerUpType.tripleBall:
         break; // мгновенный эффект, отменять нечего
@@ -329,6 +330,31 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     for (final e in _effects) _revertEffect(e.type);
     _effects.clear();
     _notifyPowerUp();
+  }
+
+  /// When fireball expires, the ball may be trapped inside a tight gap between
+  /// indestructible bricks and a wall. Push it to a safe open position.
+  void _escapeBallFromBricks(Ball b) {
+    if (!b.isLaunched) return;
+    final bRect = b.toAbsoluteRect();
+    final stuck = bricks.any(
+      (br) => br.isMounted && bRect.overlaps(br.toAbsoluteRect()),
+    );
+    if (!stuck) return;
+
+    // Find the bottom edge of the lowest brick row so we can exit below them.
+    double lowestBottom = 0;
+    for (final br in bricks) {
+      if (!br.isMounted) continue;
+      final bottom = br.absolutePosition.y + br.size.y;
+      if (bottom > lowestBottom) lowestBottom = bottom;
+    }
+
+    // Place ball just below all bricks, centered horizontally.
+    b.position.x = size.x / 2;
+    b.position.y = lowestBottom + b.radius + 8;
+    // Ensure ball is heading downward toward paddle so player can still save it.
+    if (b.velocity.y < 0) b.reflectY();
   }
 
   // ── Collisions ────────────────────────────────────────────────────────────
@@ -377,7 +403,11 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
         final bb = brick.toAbsoluteRect();
         final overlapX = min(ballB.right - bb.left, bb.right - ballB.left);
         final overlapY = min(ballB.bottom - bb.top, bb.bottom - ballB.top);
-        if (overlapX < overlapY) {
+        // При угловом ударе (overlapX ≈ overlapY) используем вектор скорости,
+        // чтобы выбрать правильную ось отражения и избежать "прыжка".
+        final useX = overlapX < overlapY ||
+            ((overlapY - overlapX).abs() <= 1.5 && b.velocity.x.abs() > b.velocity.y.abs());
+        if (useX) {
           b.reflectX();
           if (b.velocity.x < 0) {
             b.position.x = bb.left - b.radius;
@@ -477,14 +507,12 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
   }
 
   void _onBossDefeated() {
-    debugPrint('[ARKANOID] Boss defeated!');
+    debugPrint('[ARKANOID] Boss defeated! Total bosses: ${_bossCount + 1}');
     _isBossLevel = false;
     _bullets.clear();
     justDefeatedBoss = true;
-    if (_bossIndex == 0) {
-      _tripleBallUnlocked = true;
-      debugPrint('[ARKANOID] Triple ball unlocked!');
-    }
+    _bossCount++;
+    _tripleBallUnlocked = true; // разблокируется после первого босса навсегда
     _triggerLevelComplete();
   }
 
@@ -533,7 +561,7 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     PowerUpType.paddleWide   => 8.0,
     PowerUpType.paddleNarrow => 6.0,
     PowerUpType.ballBig      => 7.0,
-    PowerUpType.ballFast     => 5.0,
+    PowerUpType.ballFast     => 8.0,
     PowerUpType.magnetPaddle => 6.0,
     PowerUpType.slowBall     => 6.0,
     PowerUpType.extraLife    => 0.0,
@@ -541,16 +569,27 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     PowerUpType.tripleBall   => 0.0,
   };
 
+  /// ballFast и slowBall можно стакировать до 2 раз — каждый стак независим.
+  static const _stackableTypes = {PowerUpType.ballFast, PowerUpType.slowBall};
+
   void applyPowerUp(PowerUpType type, {required double duration}) {
     final opp = _oppositeOf(type);
     if (opp != null) {
       _effects.removeWhere((e) { if (e.type == opp) { _revertEffect(opp); return true; } return false; });
     }
-    final ex = _effects.where((e) => e.type == type).toList();
-    if (ex.isNotEmpty) {
-      ex.first.remaining = max(ex.first.remaining, duration);
-    } else if (duration > 0) {
-      _effects.add(_ActiveEffect(type, duration));
+    if (_stackableTypes.contains(type)) {
+      // Стакируемые эффекты: каждый пик добавляет отдельный таймер, максимум 2
+      final current = _effects.where((e) => e.type == type).length;
+      if (duration > 0 && current < 2) {
+        _effects.add(_ActiveEffect(type, duration));
+      }
+    } else {
+      final ex = _effects.where((e) => e.type == type).toList();
+      if (ex.isNotEmpty) {
+        ex.first.remaining = max(ex.first.remaining, duration);
+      } else if (duration > 0) {
+        _effects.add(_ActiveEffect(type, duration));
+      }
     }
 
     switch (type) {
@@ -652,26 +691,27 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
 
   void advanceLevel() {
     if (justDefeatedBoss) {
+      // После победы над боссом — следующий обычный уровень
       justDefeatedBoss = false;
       currentLevel = currentLevel >= maxLevels ? 1 : currentLevel + 1;
       _setupLevel();
       return;
     }
-    _totalLevelsCompleted++;
-    if (_totalLevelsCompleted % 5 == 0) {
-      _bossIndex = (_totalLevelsCompleted ~/ 5 - 1) % 4;
+    if (currentLevel == 5) {
+      // После уровня 5 — всегда босс
+      _bossIndex = _bossCount % 4;
       _setupBossLevel();
-    } else {
-      currentLevel = currentLevel >= maxLevels ? 1 : currentLevel + 1;
-      _setupLevel();
+      return;
     }
+    currentLevel = currentLevel >= maxLevels ? 1 : currentLevel + 1;
+    _setupLevel();
   }
 
   void restartGame() {
     score = 0;
     lives = 3;
     currentLevel = 1;
-    _totalLevelsCompleted = 0;
+    _bossCount = 0;
     _isBossLevel = false;
     justDefeatedBoss = false;
     _bullets.clear();

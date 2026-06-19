@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppTheme { stone, neon, forest, candy }
+enum AppTheme { stone, neon, forest, candy, earth, moon, volcano, ice, space }
 
 class GameThemeData {
   final String name;
@@ -154,6 +154,133 @@ class GameThemes {
       accentColor: Color(0xFFFF4D8A),
       overlayColor: Color(0xCCFAE0EC),
       wallColor: Color(0xFFFFD6E8),
+    ),
+
+    // ── World themes ─────────────────────────────────────────────────────────
+
+    AppTheme.earth: GameThemeData(
+      name: 'Earth',
+      emoji: '🌍',
+      bgTop: Color(0xFF0A1A10),
+      bgBottom: Color(0xFF04080A),
+      ballColor: Color(0xFFE8F5E8),
+      ballHighlight: Color(0xFFFFFFFF),
+      paddleGradientStart: Color(0xFF4CAF50),
+      paddleGradientEnd: Color(0xFF2E7D32),
+      paddleStroke: Color(0xFF81C784),
+      brickColors: [
+        Color(0xFF66BB6A), // bright green
+        Color(0xFFFFB300), // amber
+        Color(0xFF8D6E63), // earth brown
+        Color(0xFF546E7A), // dark stone (indestructible)
+      ],
+      brickStroke: Color(0xFF1B2E1E),
+      brickStrokeWidth: 1.5,
+      textPrimary: Color(0xFFCCEECC),
+      textSecondary: Color(0xFF5A8A5A),
+      accentColor: Color(0xFF81C784),
+      overlayColor: Color(0xCC040A06),
+      wallColor: Color(0xFF152A18),
+    ),
+
+    AppTheme.moon: GameThemeData(
+      name: 'Moon',
+      emoji: '🌙',
+      bgTop: Color(0xFF12121E),
+      bgBottom: Color(0xFF06060C),
+      ballColor: Color(0xFFE8E8F5),
+      ballHighlight: Color(0xFFFFFFFF),
+      paddleGradientStart: Color(0xFFB0B8CC),
+      paddleGradientEnd: Color(0xFF707888),
+      paddleStroke: Color(0xFFD8DFF0),
+      brickColors: [
+        Color(0xFFCDD0DA), // light silver
+        Color(0xFF8E94A8), // mid gray
+        Color(0xFF555B70), // dark slate
+        Color(0xFF3A3F50), // charcoal (indestructible)
+      ],
+      brickStroke: Color(0xFF1A1C26),
+      brickStrokeWidth: 1.5,
+      textPrimary: Color(0xFFDDE0F0),
+      textSecondary: Color(0xFF7A80A0),
+      accentColor: Color(0xFFB8C0E0),
+      overlayColor: Color(0xCC06060E),
+      wallColor: Color(0xFF1E2030),
+    ),
+
+    AppTheme.volcano: GameThemeData(
+      name: 'Volcano',
+      emoji: '🌋',
+      bgTop: Color(0xFF180300),
+      bgBottom: Color(0xFF060000),
+      ballColor: Color(0xFFFF8C00),
+      ballHighlight: Color(0xFFFFEE44),
+      paddleGradientStart: Color(0xFFE53935),
+      paddleGradientEnd: Color(0xFF8B0000),
+      paddleStroke: Color(0xFFFF5252),
+      brickColors: [
+        Color(0xFFFF6D00), // lava orange
+        Color(0xFFD32F2F), // deep red
+        Color(0xFF880E4F), // dark crimson
+        Color(0xFF212121), // obsidian (indestructible)
+      ],
+      brickStroke: Color(0xFF1A0000),
+      brickStrokeWidth: 1.5,
+      textPrimary: Color(0xFFFFCCBB),
+      textSecondary: Color(0xFF996655),
+      accentColor: Color(0xFFFF5722),
+      overlayColor: Color(0xCC080000),
+      wallColor: Color(0xFF2A0A00),
+    ),
+
+    AppTheme.ice: GameThemeData(
+      name: 'Ice World',
+      emoji: '❄️',
+      bgTop: Color(0xFF050F1E),
+      bgBottom: Color(0xFF010508),
+      ballColor: Color(0xFFB2EBF2),
+      ballHighlight: Color(0xFFFFFFFF),
+      paddleGradientStart: Color(0xFF00BCD4),
+      paddleGradientEnd: Color(0xFF006064),
+      paddleStroke: Color(0xFF80DEEA),
+      brickColors: [
+        Color(0xFF00E5FF), // ice cyan
+        Color(0xFF40C4FF), // sky blue
+        Color(0xFF1A6EA8), // deep blue
+        Color(0xFF0D3050), // dark ice (indestructible)
+      ],
+      brickStroke: Color(0xFF03111E),
+      brickStrokeWidth: 1.5,
+      textPrimary: Color(0xFFCCF5FF),
+      textSecondary: Color(0xFF4A8AA8),
+      accentColor: Color(0xFF80DEEA),
+      overlayColor: Color(0xCC01050A),
+      wallColor: Color(0xFF0A1E30),
+    ),
+
+    AppTheme.space: GameThemeData(
+      name: 'Deep Space',
+      emoji: '🚀',
+      bgTop: Color(0xFF030010),
+      bgBottom: Color(0xFF010005),
+      ballColor: Color(0xFFCC44FF),
+      ballHighlight: Color(0xFFFFAAFF),
+      paddleGradientStart: Color(0xFF7B1FA2),
+      paddleGradientEnd: Color(0xFF4A0072),
+      paddleStroke: Color(0xFFCE93D8),
+      brickColors: [
+        Color(0xFFAA00FF), // vivid purple
+        Color(0xFFE040FB), // magenta
+        Color(0xFF651FFF), // deep violet
+        Color(0xFF1A0030), // dark nebula (indestructible)
+      ],
+      brickStroke: Color(0xFF0A0018),
+      brickStrokeWidth: 1.5,
+      textPrimary: Color(0xFFEECCFF),
+      textSecondary: Color(0xFF8855AA),
+      accentColor: Color(0xFFCE93D8),
+      overlayColor: Color(0xCC010008),
+      wallColor: Color(0xFF180028),
     ),
   };
 

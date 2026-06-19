@@ -5,6 +5,7 @@ import '../theme/game_theme.dart';
 import '../theme/theme_notifier.dart';
 import 'game_screen.dart';
 import 'leaderboard_screen.dart';
+import 'worlds_screen.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -48,6 +49,15 @@ class _MenuScreenState extends State<MenuScreen>
           FadeTransition(opacity: anim, child: child),
       transitionDuration: const Duration(milliseconds: 250),
     ));
+  }
+
+  void _openWorlds() {
+    Navigator.of(context).push(PageRouteBuilder(
+      pageBuilder: (_, anim, __) => const WorldsScreen(),
+      transitionsBuilder: (_, anim, __, child) =>
+          FadeTransition(opacity: anim, child: child),
+      transitionDuration: const Duration(milliseconds: 250),
+    )).then((_) => setState(() {})); // refresh after theme change
   }
 
   @override
@@ -213,50 +223,74 @@ class _MenuScreenState extends State<MenuScreen>
 
                     const SizedBox(height: 12),
 
-                    // Leaderboard button
-                    GestureDetector(
-                      onTap: _openLeaderboard,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.emoji_events_rounded,
-                                color: t.textSecondary, size: 16),
-                            const SizedBox(width: 8),
-                            Text('HIGH SCORES',
-                                style: TextStyle(
-                                    color: t.textSecondary,
-                                    fontSize: 12,
-                                    letterSpacing: 3,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                        ),
+                    // Bottom row: HIGH SCORES + WORLDS
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _openLeaderboard,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: t.wallColor.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: t.wallColor.withOpacity(0.5),
+                                      width: 1),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.emoji_events_rounded,
+                                        color: t.textSecondary, size: 18),
+                                    const SizedBox(height: 4),
+                                    Text('SCORES',
+                                        style: TextStyle(
+                                            color: t.textSecondary,
+                                            fontSize: 10,
+                                            letterSpacing: 2,
+                                            fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _openWorlds,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: t.accentColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: t.accentColor.withOpacity(0.4),
+                                      width: 1),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      themeNotifier.current.emoji,
+                                      style: const TextStyle(fontSize: 18),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text('WORLDS',
+                                        style: TextStyle(
+                                            color: t.accentColor,
+                                            fontSize: 10,
+                                            letterSpacing: 2,
+                                            fontWeight: FontWeight.w700)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Theme selector
-                    Column(
-                      children: [
-                        Text('THEME',
-                            style: TextStyle(
-                                color: t.textSecondary,
-                                fontSize: 10,
-                                letterSpacing: 3)),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: AppTheme.values
-                              .map((th) => _ThemeChip(
-                                    appTheme: th,
-                                    isSelected: themeNotifier.value == th,
-                                    onTap: () => themeNotifier.setTheme(th),
-                                  ))
-                              .toList(),
-                        ),
-                      ],
                     ),
                     const SizedBox(height: 32),
                   ],
@@ -415,57 +449,6 @@ class _BrickRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(3),
         ),
       )),
-    );
-  }
-}
-
-// ── Theme chip ────────────────────────────────────────────────────────────────
-
-class _ThemeChip extends StatelessWidget {
-  final AppTheme appTheme;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _ThemeChip(
-      {required this.appTheme,
-      required this.isSelected,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final data = GameThemes.get(appTheme);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? data.accentColor.withOpacity(0.2)
-              : data.wallColor.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? data.accentColor : data.wallColor.withOpacity(0.5),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(data.emoji, style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 2),
-            Text(
-              data.name.split(' ').first,
-              style: TextStyle(
-                color: isSelected ? data.accentColor : data.textSecondary,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
