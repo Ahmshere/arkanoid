@@ -4,11 +4,14 @@ import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'ball.dart';
 import 'background.dart';
 import 'boss_builder.dart';
 import 'brick.dart';
 import 'enemy_bullet.dart';
+import 'enemy_creature.dart';
+import 'explosion_effect.dart';
 import 'paddle.dart';
 import 'powerup.dart';
 import 'level_builder.dart';
@@ -79,6 +82,13 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
   double _bulletInterval = 2.5;
   final List<EnemyBullet> _bullets = [];
 
+  // Flying creatures (level 4+)
+  final List<EnemyCreature> _creatures = [];
+  final List<CreatureBullet> _creatureBullets = [];
+
+  // Visual explosion effects
+  final List<ExplosionEffect> _explosions = [];
+
   bool get isBossLevel => _isBossLevel;
   String get bossName => _bossName;
   int get bossMaxHp => _bossMaxHp;
@@ -122,6 +132,8 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     bricks.clear();
     _powerUps.clear();
     _bullets.clear();
+    _creatures.clear();
+    _creatureBullets.clear();
     for (final eb in _extraBalls) { if (eb.isMounted) remove(eb); }
     _extraBalls.clear();
 
@@ -152,6 +164,9 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     add(ball);
     _resetBallToPaddle();
 
+    // Spawn creatures on level 4+
+    _spawnCreatures();
+
     state = GameState.waitingToLaunch;
   }
 
@@ -163,6 +178,8 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     bricks.clear();
     _powerUps.clear();
     _bullets.clear();
+    _creatures.clear();
+    _creatureBullets.clear();
     for (final eb in _extraBalls) { if (eb.isMounted) remove(eb); }
     _extraBalls.clear();
 
@@ -253,7 +270,25 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
       _bullets[i].update(dt);
       if (_bullets[i].y > size.y + 20) {
         _bullets.removeAt(i);
-        _bossBulletReachedBottom(); // снаряд достиг дна — потеря жизни
+        _bossBulletReachedBottom();
+      }
+    }
+
+    // Explosion effects (always update, even during level complete)
+    for (int i = _explosions.length - 1; i >= 0; i--) {
+      _explosions[i].update(dt);
+      if (_explosions[i].isDone) _explosions.removeAt(i);
+    }
+
+    // Летающие существа + их снаряды
+    if (!_isBossLevel && state == GameState.playing) {
+      for (final c in _creatures) c.update(dt, size.x, _creatureBullets);
+    }
+    for (int i = _creatureBullets.length - 1; i >= 0; i--) {
+      _creatureBullets[i].update(dt);
+      if (_creatureBullets[i].y > size.y + 20) {
+        _creatureBullets.removeAt(i);
+        _bossBulletReachedBottom(); // потеря жизни — тот же код
       }
     }
 
@@ -261,7 +296,6 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     for (int i = _extraBalls.length - 1; i >= 0; i--) {
       final eb = _extraBalls[i];
       if (!eb.isLaunched) {
-        // Шар упал за экран — просто убираем без потери жизни
         if (eb.isMounted) remove(eb);
         _extraBalls.removeAt(i);
         continue;
@@ -269,12 +303,16 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
       _checkBallPaddleCollision(eb);
       _checkBallBrickCollisions(eb);
       if (_isBossLevel) _checkBulletCollisions(eb);
+      _checkCreatureCollisions(eb);
+      _checkCreatureBulletCollisions(eb);
     }
 
     // Основной шар
     _checkBallPaddleCollision(ball);
     _checkBallBrickCollisions(ball);
     if (_isBossLevel) _checkBulletCollisions(ball);
+    _checkCreatureCollisions(ball);
+    _checkCreatureBulletCollisions(ball);
 
     _checkPowerUpCollisions();
   }
@@ -357,6 +395,93 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
     if (b.velocity.y < 0) b.reflectY();
   }
 
+  // ── Dynamite chain explosion ──────────────────────────────────────────────
+
+  void _handleDynamiteExplosion(Brick origin) {
+    final cx = origin.absolutePosition.x + origin.size.x / 2;
+    final cy = origin.absolutePosition.y + origin.size.y / 2;
+
+    // Spawn visual explosion
+    _explosions.add(ExplosionEffect(cx, cy));
+    // covers all 8 neighbours regardless of brick size (actual size varies by screen)
+    final range = origin.size.x * 1.85 + origin.size.y * 1.85;
+
+    final toDestroy = bricks.where((br) {
+      if (!br.isMounted || !br.isDestructible) return false;
+      final bx = br.absolutePosition.x + br.size.x / 2;
+      final by = br.absolutePosition.y + br.size.y / 2;
+      final dx = bx - cx;
+      final dy = by - cy;
+      return sqrt(dx * dx + dy * dy) < range;
+    }).toList();
+
+    int chainScore = 0;
+    for (final br in toDestroy) {
+      chainScore += br.pointValue > 0 ? br.pointValue : 10;
+      remove(br);
+      bricks.remove(br);
+      _destroyedCount++;
+    }
+    // Bonus: 50 pts + 15 per chained brick
+    _addScore(chainScore + 50 + toDestroy.length * 15);
+  }
+
+  // ── Creature spawning & collisions ────────────────────────────────────────
+
+  void _spawnCreatures() {
+    _creatures.clear();
+    _creatureBullets.clear();
+    if (currentLevel < 4 || _isBossLevel) return;
+
+    final count = currentLevel >= 6 ? 2 : 1;
+    final midY = size.y * 0.52; // float in lower half of playfield
+    final spacing = size.x / (count + 1);
+
+    for (int i = 0; i < count; i++) {
+      final type = (currentLevel >= 6) ? CreatureType.ufo : CreatureType.bat;
+      _creatures.add(EnemyCreature(
+        type: type,
+        startX: spacing * (i + 1),
+        startY: midY + (i.isEven ? 0 : 30),
+      ));
+    }
+  }
+
+  /// Ball hits a creature: creature dies, ball deflects randomly, +150 pts.
+  void _checkCreatureCollisions(Ball b) {
+    if (!b.isLaunched) return;
+    final bRect = b.toAbsoluteRect();
+    for (int i = _creatures.length - 1; i >= 0; i--) {
+      final c = _creatures[i];
+      if (!c.alive) continue;
+      if (!bRect.overlaps(c.rect)) continue;
+      c.alive = false;
+      _creatures.removeAt(i);
+      _addScore(150);
+      // Randomise ball direction slightly so it doesn't just bounce straight back
+      final angle = (pi / 4) + Random().nextDouble() * (pi / 2);
+      final speed = b.velocity.length;
+      final sign = b.velocity.x >= 0 ? 1 : -1;
+      b.velocity = Vector2(
+        sign * speed * cos(angle),
+        -speed.abs() * sin(angle).abs(), // always send upward
+      );
+      break;
+    }
+  }
+
+  /// Ball hits a creature bullet: bullet destroyed, ball continues, +20 pts.
+  void _checkCreatureBulletCollisions(Ball b) {
+    if (!b.isLaunched) return;
+    final bRect = b.toAbsoluteRect();
+    for (int i = _creatureBullets.length - 1; i >= 0; i--) {
+      if (bRect.overlaps(_creatureBullets[i].rect)) {
+        _creatureBullets.removeAt(i);
+        _addScore(20);
+      }
+    }
+  }
+
   // ── Collisions ────────────────────────────────────────────────────────────
 
   void _checkBallPaddleCollision(Ball b) {
@@ -377,6 +502,9 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
       b.reflectOffPaddle(hitFraction);
       b.position.y = paddle.top - b.radius;
     }
+
+    // Лёгкая вибрация при касании ракетки
+    HapticFeedback.lightImpact();
   }
 
   void _checkBallBrickCollisions(Ball b) {
@@ -392,10 +520,12 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
         // Огненный шар — сквозь любые кирпичи без отражения
         if (!brick.isDestructible) continue; // X пропускаем насквозь
         _maybeDrop(brick);
+        final wasDynamite = brick.isDynamite;
         remove(brick);
         bricks.removeAt(i);
         _destroyedCount++;
         _addScore(brick.pointValue);
+        if (wasDynamite) _handleDynamiteExplosion(brick);
         final remaining = bricks.where((br) => br.isDestructible).length;
         if (remaining == 0) { _triggerLevelComplete(); return; }
       } else {
@@ -426,10 +556,19 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
         final destroyed = brick.hit();
         if (destroyed) {
           _maybeDrop(brick);
-          remove(brick);
-          bricks.removeAt(i);
-          _destroyedCount++;
-          _addScore(brick.pointValue);
+          if (brick.isDynamite) {
+            // Remove hit brick first, then chain-explode neighbours
+            remove(brick);
+            bricks.removeAt(i);
+            _destroyedCount++;
+            _addScore(brick.pointValue);
+            _handleDynamiteExplosion(brick);
+          } else {
+            remove(brick);
+            bricks.removeAt(i);
+            _destroyedCount++;
+            _addScore(brick.pointValue);
+          }
           final remaining = bricks.where((br) => br.isDestructible).length;
           debugPrint('[ARKANOID] destroyed=$_destroyedCount / remaining=$remaining');
           if (remaining == 0) { _triggerLevelComplete(); return; }
@@ -781,8 +920,11 @@ class ArkanoidGame extends FlameGame with PanDetector, TapCallbacks {
 
     super.render(canvas);
 
-    // Рисуем бонусы и снаряды поверх всего
+    // Рисуем бонусы, снаряды, существ и взрывы поверх всего
     for (final pu in _powerUps) pu.render(canvas);
     for (final bullet in _bullets) bullet.render(canvas);
+    for (final c in _creatures) c.render(canvas);
+    for (final cb in _creatureBullets) cb.render(canvas);
+    for (final ex in _explosions) ex.render(canvas);
   }
 }

@@ -8,67 +8,67 @@ class LevelBuilder {
   static const double topOffset = 110.0;
   static final Random _rng = Random();
 
-  // L=normal1, M=normal2, H=hard, X=indestructible, _=пусто
+  // L=normal1, M=normal2, H=hard, X=indestructible, D=dynamite, _=пусто
   // Все ряды — не более 8 символов
   static const List<LevelLayout> _layouts = [
-    // Level 1 — чистые ряды, без непробиваемых
+    // Level 1 — чистые ряды, 1 динамит
     [
       'LLLLLLLL',
-      'LMLLMLLL',
+      'LMLDMLLL',
       'MMMMMMMM',
       'MLMMMLMM',
     ],
-    // Level 2 — барьеры с проходами, 3 ряда кирпичей между ними
+    // Level 2 — барьеры с проходами, 1 динамит между барьерами
     [
       'LLLLLLLL',
-      '_XXXXXX_', // барьер 1, проходы по краям
-      'LLLLLLLL', // новый ряд между барьерами
+      '_XXXXXX_',
+      'LLDLLLLL',
       'MMMMMMMM',
-      'LLLLLLLL', // новый ряд между барьерами
-      '__XXXX__', // барьер 2, широкие проходы по краям
+      'LLLLLLLL',
+      '__XXXX__',
       'HHHHHHHH',
     ],
-    // Level 3 — крепость с проходом в центре
+    // Level 3 — крепость, динамит внутри
     [
-      'XXX__XXX', // проход 2 кирпича в центре сверху
+      'XXX__XXX',
       'XLLLLLLX',
-      'XLMHHMLX',
+      'XLMDHMLX',
       'XLMHHMLX',
       'XLLLLLLX',
-      'XXX__XXX', // проход в центре снизу
+      'XXX__XXX',
     ],
-    // Level 4 — ромб (проходим: мяч огибает пустые клетки)
+    // Level 4 — ромб, 1 динамит в центре
     [
       '___XX___',
       '__XHHX__',
       '_XHMMHX_',
-      'XHMMMMHX',
+      'XHDMMMHX',
       '_XHMMHX_',
       '__XHHX__',
       '___XX___',
       'LLLLLLLL',
     ],
-    // Level 5 — крест с проходами по краям горизонтальных балок
+    // Level 5 — крест, 1 динамит на верхней секции
     [
       'MMMXXMMM',
+      'MMDXXMMM',
+      '_XXXXXX_',
+      'HHHXXHHH',
       'MMMXXMMM',
-      '_XXXXXX_', // барьер 1, проходы по краям
-      'HHHXXHHH', // ряд 1 между барьерами
-      'MMMXXMMM', // ряд 2 между барьерами
-      '_XXXXXX_', // барьер 2, проходы по краям
+      '_XXXXXX_',
       'MMMXXMMM',
       'MMMXXMMM',
     ],
-    // Level 6 — хаос (генерируется)
+    // Level 6 — хаос (генерируется, 1 динамит добавляется отдельно)
     [],
-    // Level 7 — три колонны, X-потолок сверху (мяч входит снизу свободно)
+    // Level 7 — три колонны, 1 динамит в средней секции
     [
-      'XXXXXXXX', // непробиваемый потолок
+      'XXXXXXXX',
       'MMXMMXMM',
       'HHXHHXHH',
-      'MMXMMXMM',
+      'MDXMMXMM',
       'HHXHHXHH',
-      'MMXMMXMM', // мяч бьёт сюда первым
+      'MMXMMXMM',
     ],
   ];
 
@@ -110,6 +110,7 @@ class LevelBuilder {
           'M' => BrickType.normal2,
           'H' => BrickType.hard,
           'X' => BrickType.indestructible,
+          'D' => BrickType.dynamite,
           _ => null,
         };
         if (type == null) continue;
@@ -135,16 +136,25 @@ class LevelBuilder {
     final startX = (gameSize.x - (cols * stepW - Brick.brickGap)) / 2;
     int idx = 0;
 
+    // Pick one random position for dynamite (skip row 0 so it's reachable)
+    final dynRow = 1 + _rng.nextInt(rows - 1);
+    final dynCol = _rng.nextInt(cols);
+
     for (int row = 0; row < rows; row++) {
       for (int col = 0; col < cols; col++) {
-        final r = _rng.nextInt(10);
-        final type = r < 1
-            ? BrickType.indestructible
-            : r < 3
-                ? BrickType.hard
-                : r < 6
-                    ? BrickType.normal2
-                    : BrickType.normal1;
+        BrickType type;
+        if (row == dynRow && col == dynCol) {
+          type = BrickType.dynamite;
+        } else {
+          final r = _rng.nextInt(10);
+          type = r < 1
+              ? BrickType.indestructible
+              : r < 3
+                  ? BrickType.hard
+                  : r < 6
+                      ? BrickType.normal2
+                      : BrickType.normal1;
+        }
 
         bricks.add(Brick(
           type: type,
