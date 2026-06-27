@@ -43,4 +43,4 @@ We may update this Privacy Policy from time to time. Changes will be posted on t
 
 ## Contact
 
-If you have any questions about this Privacy Policy, contact us at: michael@dormotech.com
+If you have any questions about this Privacy Policy, contact us at: adelaida.records@gmail.com
