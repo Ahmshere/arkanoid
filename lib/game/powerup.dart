@@ -10,7 +10,13 @@ enum PowerUpType {
   extraLife,
   slowBall,
   fireball,
+  iceball,
   tripleBall,
+  laser,      // 'l' — платформа стреляет лазерами при тапе
+  shield,     // 'p' — нижний барьер, шар не падает
+  ghostBall,  // 'n' — шар проходит сквозь кирпичи без отскока
+  mineBall,   // 'm' — следующие 3 попадания = взрыв как динамит
+  stickyBall, // 'c' — шар прилипает к платформе при каждом касании
 }
 
 extension PowerUpInfo on PowerUpType {
@@ -23,6 +29,7 @@ extension PowerUpInfo on PowerUpType {
   bool get isDuration => switch (this) {
     PowerUpType.extraLife  => false,
     PowerUpType.tripleBall => false,
+    PowerUpType.mineBall   => false, // счётчик попаданий, не таймер
     _ => true,
   };
 
@@ -35,7 +42,13 @@ extension PowerUpInfo on PowerUpType {
     PowerUpType.extraLife    => '+LIFE',
     PowerUpType.slowBall     => 'SLOW',
     PowerUpType.fireball     => 'FIREBALL',
+    PowerUpType.iceball      => 'ICEBALL',
     PowerUpType.tripleBall   => 'MULTI',
+    PowerUpType.laser        => 'LASER',
+    PowerUpType.shield       => 'SHIELD',
+    PowerUpType.ghostBall    => 'GHOST',
+    PowerUpType.mineBall     => 'MINE×3',
+    PowerUpType.stickyBall   => 'STICKY',
   };
 
   Color get color => switch (this) {
@@ -47,7 +60,13 @@ extension PowerUpInfo on PowerUpType {
     PowerUpType.extraLife    => const Color(0xFFE91E63),
     PowerUpType.slowBall     => const Color(0xFF00BCD4),
     PowerUpType.fireball     => const Color(0xFFFF6D00),
+    PowerUpType.iceball      => const Color(0xFF00CFFF),
     PowerUpType.tripleBall   => const Color(0xFF00E676),
+    PowerUpType.laser        => const Color(0xFFFF1744),
+    PowerUpType.shield       => const Color(0xFF00E5FF),
+    PowerUpType.ghostBall    => const Color(0xFFB39DDB),
+    PowerUpType.mineBall     => const Color(0xFFFFD600),
+    PowerUpType.stickyBall   => const Color(0xFF69F0AE),
   };
 }
 
@@ -100,11 +119,13 @@ class FallingPowerUp {
       Paint()
         ..color = type == PowerUpType.fireball
             ? Colors.orange.withOpacity(0.8)
-            : type.isPositive
-                ? Colors.white.withOpacity(0.5)
-                : Colors.red.withOpacity(0.65)
+            : type == PowerUpType.iceball
+                ? const Color(0xFF80EEFF).withOpacity(0.9)
+                : type.isPositive
+                    ? Colors.white.withOpacity(0.5)
+                    : Colors.red.withOpacity(0.65)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = type == PowerUpType.fireball ? 2.0 : 1.5,
+        ..strokeWidth = (type == PowerUpType.fireball || type == PowerUpType.iceball) ? 2.0 : 1.5,
     );
 
     // Блик
@@ -155,6 +176,7 @@ const double kPowerUpChance = 0.32;
 PowerUpType randomPowerUp(Random rng, {bool tripleBallEnabled = false}) {
   final types = PowerUpType.values.where((t) {
     if (t == PowerUpType.fireball) return false;
+    if (t == PowerUpType.iceball) return false;
     if (t == PowerUpType.tripleBall && !tripleBallEnabled) return false;
     return true;
   }).toList();

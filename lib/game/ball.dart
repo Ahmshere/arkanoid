@@ -14,9 +14,10 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
   bool isLaunched = false;
   bool isMagnetized = false;
   bool isFireball = false;
+  bool isIceball = false;
   bool isExtra = false; // доп. шар (тройной шар) — не отнимает жизнь при падении
 
-  // Шлейф огненного шара
+  // Шлейф огненного / ледяного шара
   final List<Vector2> _trail = [];
   static const int _trailLength = 12;
 
@@ -32,6 +33,10 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
     if (isFireball) {
       paint = Paint()
         ..color = const Color(0xFFFF6600)
+        ..style = PaintingStyle.fill;
+    } else if (isIceball) {
+      paint = Paint()
+        ..color = const Color(0xFF00CFFF)
         ..style = PaintingStyle.fill;
     } else {
       final t = themeNotifier.current;
@@ -55,6 +60,7 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
     isLaunched = false;
     isMagnetized = false;
     isFireball = false;
+    isIceball = false;
     _trail.clear();
     radius = ballRadius;
     _updatePaint();
@@ -71,6 +77,13 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
 
   void setFireball(bool active) {
     isFireball = active;
+    if (active) isIceball = false; // mutual exclusion
+    _updatePaint();
+  }
+
+  void setIceball(bool active) {
+    isIceball = active;
+    if (active) isFireball = false; // mutual exclusion
     _updatePaint();
   }
 
@@ -86,12 +99,18 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
         final trailR = radius * (1.0 - ageFrac * 0.70).clamp(0.05, 1.0);
         final alpha = ((1.0 - ageFrac) * 0.55).clamp(0.0, 1.0);
         final tp = _trail[i];
-        // Позиция в локальных координатах (центр шара = (radius, radius))
         final lx = tp.x - position.x + radius;
         final ly = tp.y - position.y + radius;
-        final color = ageFrac < 0.5
-            ? const Color(0xFFFFD700) // золотой — свежие
-            : const Color(0xFFFF3300); // красно-оранжевый — старые
+        final Color color;
+        if (isIceball) {
+          color = ageFrac < 0.5
+              ? const Color(0xFFCCF6FF) // белесо-голубой — свежие
+              : const Color(0xFF009FCC); // тёмно-синий — старые
+        } else {
+          color = ageFrac < 0.5
+              ? const Color(0xFFFFD700) // золотой — свежие
+              : const Color(0xFFFF3300); // красно-оранжевый — старые
+        }
         canvas.drawCircle(
           Offset(lx, ly),
           trailR,
@@ -103,7 +122,7 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
     }
 
     if (isFireball) {
-      // Огненный ореол вокруг шара
+      // Огненный ореол
       canvas.drawCircle(
         Offset(cx, cy),
         radius * 1.7,
@@ -118,6 +137,31 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
           ..color = const Color(0xFFFF6600).withOpacity(0.30)
           ..style = PaintingStyle.fill,
       );
+    } else if (isIceball) {
+      // Ледяной ореол
+      canvas.drawCircle(
+        Offset(cx, cy),
+        radius * 1.8,
+        Paint()
+          ..color = const Color(0xFF87EEFF).withOpacity(0.14)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        Offset(cx, cy),
+        radius * 1.4,
+        Paint()
+          ..color = const Color(0xFF00CFFF).withOpacity(0.28)
+          ..style = PaintingStyle.fill,
+      );
+      // Кольцо льда
+      canvas.drawCircle(
+        Offset(cx, cy),
+        radius * 1.15,
+        Paint()
+          ..color = Colors.white.withOpacity(0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
     }
 
     super.render(canvas);
@@ -128,7 +172,7 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
       Offset(cx - radius * 0.28, cy - radius * 0.28),
       radius * 0.26,
       Paint()
-        ..color = (isFireball ? Colors.yellow : t.ballHighlight).withOpacity(0.55)
+        ..color = (isFireball ? Colors.yellow : isIceball ? Colors.white : t.ballHighlight).withOpacity(0.55)
         ..style = PaintingStyle.fill,
     );
 
@@ -150,7 +194,7 @@ class Ball extends CircleComponent with HasGameRef<ArkanoidGame> {
     if (!isLaunched) return;
 
     // Обновляем шлейф
-    if (isFireball && !isMagnetized) {
+    if ((isFireball || isIceball) && !isMagnetized) {
       _trail.insert(0, position.clone());
       if (_trail.length > _trailLength) _trail.removeLast();
     } else {

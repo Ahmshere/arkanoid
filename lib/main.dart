@@ -5,6 +5,7 @@ import 'data/score_repository.dart';
 import 'data/progress_repository.dart';
 import 'theme/theme_notifier.dart';
 import 'screens/menu_screen.dart';
+import 'services/ad_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +27,9 @@ void main() async {
 
   // Load saved theme selection
   await themeNotifier.load();
+
+  // Инициализация AdMob
+  await AdManager.instance.initialize();
 
   runApp(const ArkanoidApp());
 }

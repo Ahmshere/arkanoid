@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flame: ^1.18.0
-  # google_mobile_ads: ^4.0.0   # добавить перед релизом
+  google_mobile_ads: ^5.1.0
   shared_preferences: ^2.3.2
   # audioplayers: ^6.1.0        # добавить когда будут звуки
 

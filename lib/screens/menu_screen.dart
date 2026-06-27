@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/score_repository.dart';
 import '../theme/game_theme.dart';
 import '../theme/theme_notifier.dart';
+import '../game/arkanoid_game.dart';
 import 'game_screen.dart';
 import 'leaderboard_screen.dart';
 import 'worlds_screen.dart';
@@ -179,7 +180,7 @@ class _MenuScreenState extends State<MenuScreen>
                             children: [
                               GestureDetector(
                                 onTap: () => setState(() =>
-                                    _debugLevel = (_debugLevel - 1).clamp(1, 7)),
+                                    _debugLevel = (_debugLevel - 1).clamp(1, ArkanoidGame.maxLevels)),
                                 child: Container(
                                   width: 28,
                                   height: 28,
@@ -203,7 +204,7 @@ class _MenuScreenState extends State<MenuScreen>
                               ),
                               GestureDetector(
                                 onTap: () => setState(() =>
-                                    _debugLevel = (_debugLevel + 1).clamp(1, 7)),
+                                    _debugLevel = (_debugLevel + 1).clamp(1, ArkanoidGame.maxLevels)),
                                 child: Container(
                                   width: 28,
                                   height: 28,
@@ -318,6 +319,7 @@ class _AnimatedBackgroundState extends State<_AnimatedBackground>
   late AnimationController _ctrl;
   late List<_FloatParticle> _particles;
   final Random _rng = Random();
+  _DemoBall? _ball;
 
   @override
   void initState() {
@@ -338,12 +340,43 @@ class _AnimatedBackgroundState extends State<_AnimatedBackground>
     final t = widget.theme;
     const dt = 1 / 60;
 
+    // Инициализируем мяч при первом кадре, когда знаем размер экрана
+    _ball ??= _DemoBall(size, _rng);
+    _ball!.tick(dt, size);
+
     for (final p in _particles) p.tick(dt, size);
 
     return CustomPaint(
       size: size,
-      painter: _BgPainter(_particles, t),
+      painter: _BgPainter(_particles, t, _ball!),
     );
+  }
+}
+
+// Демо-мяч прыгающий по фону меню
+class _DemoBall {
+  double x, y, vx, vy;
+  final double r = 10.0;
+  final List<Offset> _trail = [];
+  static const int _trailLen = 18;
+
+  _DemoBall(Size screen, Random rng)
+      : x = screen.width * 0.5,
+        y = screen.height * 0.55,
+        vx = 95 + rng.nextDouble() * 50,
+        vy = -(100 + rng.nextDouble() * 60);
+
+  void tick(double dt, Size screen) {
+    x += vx * dt;
+    y += vy * dt;
+    // Отскок от стен
+    if (x < r) { x = r; vx = vx.abs(); }
+    if (x > screen.width - r) { x = screen.width - r; vx = -vx.abs(); }
+    if (y < r) { y = r; vy = vy.abs(); }
+    if (y > screen.height - r) { y = screen.height - r; vy = -vy.abs(); }
+
+    _trail.add(Offset(x, y));
+    if (_trail.length > _trailLen) _trail.removeAt(0);
   }
 }
 
@@ -376,7 +409,8 @@ class _FloatParticle {
 class _BgPainter extends CustomPainter {
   final List<_FloatParticle> particles;
   final GameThemeData theme;
-  _BgPainter(this.particles, this.theme);
+  final _DemoBall ball;
+  _BgPainter(this.particles, this.theme, this.ball);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -424,6 +458,39 @@ class _BgPainter extends CustomPainter {
       }
       canvas.restore();
     }
+
+    // Трейл мяча
+    final trail = ball._trail;
+    for (int i = 0; i < trail.length; i++) {
+      final t = i / trail.length;
+      canvas.drawCircle(
+        trail[i],
+        ball.r * (0.3 + t * 0.5),
+        Paint()
+          ..color = theme.accentColor.withOpacity(t * 0.18),
+      );
+    }
+
+    // Сам мяч
+    final ballPos = Offset(ball.x, ball.y);
+    // Свечение
+    canvas.drawCircle(
+      ballPos,
+      ball.r * 2.2,
+      Paint()..color = theme.accentColor.withOpacity(0.10),
+    );
+    // Основной круг
+    canvas.drawCircle(
+      ballPos,
+      ball.r,
+      Paint()..color = Colors.white.withOpacity(0.18),
+    );
+    // Блик
+    canvas.drawCircle(
+      Offset(ball.x - ball.r * 0.3, ball.y - ball.r * 0.3),
+      ball.r * 0.35,
+      Paint()..color = Colors.white.withOpacity(0.22),
+    );
   }
 
   @override
@@ -485,64 +552,104 @@ class _AnimatedTitleState extends State<_AnimatedTitle>
   @override
   Widget build(BuildContext context) {
     final t = widget.theme;
-    // Assign a color per letter cycling through the first 3 brick colors
     final palette = [t.brickColors[0], t.brickColors[1], t.brickColors[2]];
 
-    return Row(
+    return LayoutBuilder(builder: (_, __) {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: List.generate(_letters.length, (i) {
-        final phase = _ctrl.value * 2 * pi - i * 0.55;
-        final dy = sin(phase) * 7.0;
+        final phase = _ctrl.value * 2 * pi - i * 0.52;
+        final dy = sin(phase) * 9.0;
         final color = palette[i % palette.length];
+        final light = Color.lerp(color, Colors.white, 0.30)!;
+        final dark  = Color.lerp(color, Colors.black, 0.30)!;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2.5),
+          padding: const EdgeInsets.symmetric(horizontal: 3),
           child: Transform.translate(
             offset: Offset(0, dy),
             child: Container(
-              width: 34,
-              height: 32,
+              width: 50,
+              height: 46,
               decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(9),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [light, color, dark],
+                  stops: const [0.0, 0.45, 1.0],
+                ),
                 boxShadow: [
+                  // Цветное свечение
                   BoxShadow(
-                    color: color.withOpacity(0.55),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                    offset: const Offset(0, 4),
+                    color: color.withOpacity(0.65),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 6),
+                  ),
+                  // 3D нижний сдвиг
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.45),
+                    blurRadius: 0,
+                    offset: const Offset(4, 5),
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Stack(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                  // Верхний бевел (светлая грань)
+                  Positioned(
+                    left: 4, top: 4, right: 4,
                     child: Container(
                       height: 5,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withOpacity(0.38),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                  // Левый бевел
+                  Positioned(
+                    left: 4, top: 4, bottom: 7,
+                    child: Container(
+                      width: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.20),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _letters[i],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      height: 1,
-                      shadows: [
-                        Shadow(
-                          color: Color(0x66000000),
-                          offset: Offset(1, 1),
-                          blurRadius: 2,
+                  // Нижняя тёмная грань
+                  Positioned(
+                    left: 0, right: 0, bottom: 0,
+                    child: Container(
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.28),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(9),
+                          bottomRight: Radius.circular(9),
                         ),
-                      ],
+                      ),
+                    ),
+                  ),
+                  // Буква
+                  Center(
+                    child: Text(
+                      _letters[i],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                        shadows: [
+                          Shadow(color: Color(0x88000000), offset: Offset(1, 2), blurRadius: 3),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -551,6 +658,8 @@ class _AnimatedTitleState extends State<_AnimatedTitle>
           ),
         );
       }),
-    );
+        ), // Row
+      ); // FittedBox
+    }); // LayoutBuilder
   }
 }

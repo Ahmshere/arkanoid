@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flame/components.dart';
 import 'brick.dart';
+import 'powerup.dart';
+import 'levels/all_levels.dart';
 
 typedef LevelLayout = List<String>;
 
@@ -8,73 +10,18 @@ class LevelBuilder {
   static const double topOffset = 110.0;
   static final Random _rng = Random();
 
-  // L=normal1, M=normal2, H=hard, X=indestructible, D=dynamite, _=пусто
-  // Все ряды — не более 8 символов
-  static const List<LevelLayout> _layouts = [
-    // Level 1 — чистые ряды, 1 динамит
-    [
-      'LLLLLLLL',
-      'LMLDMLLL',
-      'MMMMMMMM',
-      'MLMMMLMM',
-    ],
-    // Level 2 — барьеры с проходами, 1 динамит между барьерами
-    [
-      'LLLLLLLL',
-      '_XXXXXX_',
-      'LLDLLLLL',
-      'MMMMMMMM',
-      'LLLLLLLL',
-      '__XXXX__',
-      'HHHHHHHH',
-    ],
-    // Level 3 — крепость, динамит внутри
-    [
-      'XXX__XXX',
-      'XLLLLLLX',
-      'XLMDHMLX',
-      'XLMHHMLX',
-      'XLLLLLLX',
-      'XXX__XXX',
-    ],
-    // Level 4 — ромб, 1 динамит в центре
-    [
-      '___XX___',
-      '__XHHX__',
-      '_XHMMHX_',
-      'XHDMMMHX',
-      '_XHMMHX_',
-      '__XHHX__',
-      '___XX___',
-      'LLLLLLLL',
-    ],
-    // Level 5 — два барьера с широкими проходами, без центральной X-колонны
-    [
-      'MMM__MMM',
-      'MMD__MMM',
-      '__XXXX__', // барьер 1 — 2 прохода по 2 кирпича
-      'HHH__HHH',
-      'MMM__MMM',
-      '__XXXX__', // барьер 2 — 2 прохода по 2 кирпича
-      'MMMMMMMM',
-      'MMMMMMMM',
-    ],
-    // Level 6 — хаос (генерируется, 1 динамит добавляется отдельно)
-    [],
-    // Level 7 — три колонны, 1 динамит в средней секции
-    [
-      'XXXXXXXX',
-      'MMXMMXMM',
-      'HHXHHXHH',
-      'MDXMMXMM',
-      'HHXHHXHH',
-      'MMXMMXMM',
-    ],
-  ];
+  // UPPERCASE (кирпичи):
+  //   M=normal2  H=hard  X=indestructible  D=dynamite  _=пусто
+  // lowercase (normal1-кирпич с гарантированным бонусом при разрушении):
+  //   f=fireball  i=iceball  s=speed  t=triple  b=big  g=magnet  e=+life  w=slow
+  //   l=laser  p=shield  n=ghost  m=mine  c=sticky
+
+  /// Количество уровней определяется автоматически из allLevels.
+  static int get levelCount => allLevels.length;
 
   static List<Brick> buildLevel(int level, Vector2 gameSize) {
-    final idx = (level - 1).clamp(0, _layouts.length - 1);
-    final layout = _layouts[idx];
+    final idx = (level - 1).clamp(0, allLevels.length - 1);
+    final layout = allLevels[idx];
     return layout.isEmpty
         ? _buildRandom(level, gameSize)
         : buildFromLayout(layout, gameSize);
@@ -82,7 +29,7 @@ class LevelBuilder {
 
   /// Вычисляет ширину кирпича так, чтобы [cols] колонок помещались на экране.
   static double _brickWidth(double screenW, int cols) {
-    const margin = 6.0; // отступ с каждой стороны
+    const margin = 6.0;
     const gap = Brick.brickGap;
     final w = ((screenW - 2 * margin - (cols - 1) * gap) / cols).floorToDouble();
     return w.clamp(20.0, Brick.brickWidth.toDouble());
@@ -93,7 +40,6 @@ class LevelBuilder {
     final stepH = Brick.brickHeight + Brick.brickGap;
     int globalIndex = 0;
 
-    // Единая ширина кирпича для всего уровня — берём максимальное кол-во колонок
     final maxCols = layout.map((r) => r.length).reduce(max);
     final brickW = _brickWidth(gameSize.x, maxCols);
 
@@ -105,12 +51,34 @@ class LevelBuilder {
       final startX = (gameSize.x - rowWidth) / 2;
 
       for (int col = 0; col < cols; col++) {
-        BrickType? type = switch (rowStr[col]) {
+        final ch = rowStr[col];
+
+        // Строчные буквы = кирпич-«подарок» с гарантированным бонусом
+        final PowerUpType? drop = switch (ch) {
+          'f' => PowerUpType.fireball,
+          'i' => PowerUpType.iceball,
+          's' => PowerUpType.ballFast,
+          't' => PowerUpType.tripleBall,
+          'b' => PowerUpType.ballBig,
+          'g' => PowerUpType.magnetPaddle,
+          'e' => PowerUpType.extraLife,
+          'w' => PowerUpType.slowBall,
+          'l' => PowerUpType.laser,
+          'p' => PowerUpType.shield,
+          'n' => PowerUpType.ghostBall,
+          'm' => PowerUpType.mineBall,
+          'c' => PowerUpType.stickyBall,
+          _   => null,
+        };
+
+        BrickType? type = switch (ch) {
           'L' => BrickType.normal1,
           'M' => BrickType.normal2,
           'H' => BrickType.hard,
           'X' => BrickType.indestructible,
           'D' => BrickType.dynamite,
+          // строчные буквы → normal1 кирпич с бонусом
+          _ when drop != null => BrickType.normal1,
           _ => null,
         };
         if (type == null) continue;
@@ -120,6 +88,7 @@ class LevelBuilder {
           position: Vector2(startX + col * stepW, topOffset + row * stepH),
           colorIndex: globalIndex++,
           width: brickW,
+          guaranteedDrop: drop,
         ));
       }
     }
@@ -136,7 +105,6 @@ class LevelBuilder {
     final startX = (gameSize.x - (cols * stepW - Brick.brickGap)) / 2;
     int idx = 0;
 
-    // Pick one random position for dynamite (skip row 0 so it's reachable)
     final dynRow = 1 + _rng.nextInt(rows - 1);
     final dynCol = _rng.nextInt(cols);
 

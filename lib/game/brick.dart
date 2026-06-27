@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import '../theme/theme_notifier.dart';
+import 'powerup.dart';
 
 enum BrickType { normal1, normal2, hard, indestructible, dynamite }
 
@@ -12,6 +13,10 @@ class Brick extends RectangleComponent {
 
   final BrickType type;
   final int colorIndex; // индивидуальный цвет кирпича
+
+  /// Если задан — кирпич всегда роняет именно этот бонус при уничтожении.
+  final PowerUpType? guaranteedDrop;
+
   int _hp;
   bool _isHitFlashing = false;
   double _flashTimer = 0.0;
@@ -41,13 +46,18 @@ class Brick extends RectangleComponent {
 
   bool get isDynamite => type == BrickType.dynamite;
 
-  Brick({required this.type, required Vector2 position, this.colorIndex = 0, double? width})
-      : _hp = _initialHp(type),
-        super(
-          size: Vector2(width ?? brickWidth, brickHeight),
-          position: position,
-          anchor: Anchor.topLeft,
-        );
+  Brick({
+    required this.type,
+    required Vector2 position,
+    this.colorIndex = 0,
+    double? width,
+    this.guaranteedDrop,
+  }) : _hp = _initialHp(type),
+       super(
+         size: Vector2(width ?? brickWidth, brickHeight),
+         position: position,
+         anchor: Anchor.topLeft,
+       );
 
   static int _initialHp(BrickType t) => switch (t) {
     BrickType.normal1        => 1,
@@ -176,6 +186,45 @@ class Brick extends RectangleComponent {
         ..color = t.brickStroke
         ..style = PaintingStyle.stroke
         ..strokeWidth = t.brickStrokeWidth,
+    );
+
+    // Индикатор гарантированного бонуса — цветной ромб в центре
+    if (guaranteedDrop != null) {
+      _renderDropIndicator(canvas, guaranteedDrop!);
+    }
+  }
+
+  void _renderDropIndicator(Canvas canvas, PowerUpType drop) {
+    final cx = size.x / 2;
+    final cy = size.y / 2;
+    const r = 4.0; // полуразмер ромба
+
+    // Заливка ромба
+    final path = Path()
+      ..moveTo(cx, cy - r)
+      ..lineTo(cx + r, cy)
+      ..lineTo(cx, cy + r)
+      ..lineTo(cx - r, cy)
+      ..close();
+
+    canvas.drawPath(path, Paint()..color = drop.color.withOpacity(0.85));
+
+    // Белый блик
+    final blikPath = Path()
+      ..moveTo(cx - r * 0.3, cy - r * 0.5)
+      ..lineTo(cx + r * 0.4, cy - r * 0.1)
+      ..lineTo(cx, cy + r * 0.1)
+      ..lineTo(cx - r * 0.5, cy - r * 0.1)
+      ..close();
+    canvas.drawPath(blikPath, Paint()..color = Colors.white.withOpacity(0.45));
+
+    // Контур
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white.withOpacity(0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.7,
     );
   }
 
