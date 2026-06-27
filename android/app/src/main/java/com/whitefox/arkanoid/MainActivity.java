@@ -1,4 +1,4 @@
-package com.example.arkanoid;
+package com.whitefox.arkanoid;
 
 import io.flutter.embedding.android.FlutterActivity;
 

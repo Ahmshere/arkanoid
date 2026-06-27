@@ -29,7 +29,11 @@ void main() async {
   await themeNotifier.load();
 
   // Инициализация AdMob
-  await AdManager.instance.initialize();
+  try {
+    await AdManager.instance.initialize();
+  } catch (e) {
+    debugPrint('[AdMob] init failed: $e');
+  }
 
   runApp(const ArkanoidApp());
 }
