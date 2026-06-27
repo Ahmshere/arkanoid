@@ -2,10 +2,10 @@
 const List<String> level04 = [
   '___XX___',
   '__XHHX__',
-  '_XHMMHX_',
+  '__HMMH__',
   'XHDMMMHX',
-  '_XHMMHX_',
+  '__HMMH__',
   '__XHHX__',
   '___XX___',
-  'LLLLLLLL',
+  'LLLstLLL',
 ];
